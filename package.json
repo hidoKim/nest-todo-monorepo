@@ -8,8 +8,8 @@
   "scripts": {
     "start:dev": "npm run dev",
     "dev": "concurrently \"cd packages/backend && npm run start:dev\" \"cd packages/frontend && npm run start\"",
-    "build": "cd packages/backend && npm run build && cd ../frontend && npm run build",
-    "lint": "cd packages/backend && npm run lint && cd ../frontend && npm run lint"
+    "build": "concurrently -n backend,frontend \"npm -w packages/backend run build\" \"npm -w packages/frontend run build\"",
+    "lint": "concurrently -n backend,frontend \"npm -w packages/backend run lint\" \"npm -w packages/frontend run lint\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

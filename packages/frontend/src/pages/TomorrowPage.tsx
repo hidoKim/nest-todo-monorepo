@@ -1,13 +1,12 @@
 import TodoList from "../components/TodoList";
 import { useTags } from "../hooks/useTags";
 import { useTodos } from "../hooks/useTodos";
+import { formatDateLabel } from "../utils/date";
 
 const TomorrowPage = () => {
   const tags = useTags();
   const todos = useTodos({ list: "tomorrow" });
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const subtitle = `${tomorrow.getFullYear()}.${String(tomorrow.getMonth() + 1).padStart(2, "0")}.${String(tomorrow.getDate()).padStart(2, "0")} · 내일의 노트`;
+  const subtitle = `${formatDateLabel(1)} · 내일의 노트`;
 
   return (
     <TodoList

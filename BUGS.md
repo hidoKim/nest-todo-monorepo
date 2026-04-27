@@ -11,8 +11,8 @@
 |--------|------|-----------|
 | 🔴 Critical | 3 (3 ✅) | ~~SQLite `datetime` 비호환~~ ✅, ~~TypeORM 관계 update 오용~~ ✅, ~~타임존 처리~~ ✅ |
 | 🟠 High | 4 (4 ✅) | ~~CORS 와일드카드~~ ✅, ~~FE 환경변수~~ ✅, ~~태그 삭제 에러 무시~~ ✅, ~~`prompt()` UX~~ ✅ |
-| 🟡 Medium | 3 | FE/BE 날짜 불일치, 낙관적 업데이트 부재, 드래그 reorder race |
-| 🟢 Low | 4 | `.git` 구조 이상, 빌드 직렬화, sqlite/`.env` 추적, jest 설정 중복 |
+| 🟡 Medium | 3 (3 ✅) | ~~FE/BE 날짜 불일치~~ ✅, ~~낙관적 업데이트 부재~~ ✅, ~~드래그 reorder race~~ ✅ |
+| 🟢 Low | 4 (4 ✅) | ~~`.git` 구조 이상~~ ✅, ~~빌드 직렬화~~ ✅, ~~sqlite/`.env` 추적~~ ✅, ~~jest 설정 중복~~ ✅ |
 
 권장 처리 순서: ① SQLite datetime → ② CORS → ③ 환경변수 → ④ TypeORM 관계 update → ⑤ 타임존 통일.
 
@@ -255,48 +255,154 @@
 
 ## 🟡 Medium
 
-### 8. FE 표시 날짜와 BE 계산 기준 불일치
-- **파일**: `packages/frontend/src/pages/TomorrowPage.tsx:8-10`
-- **문제**: FE는 `new Date()` 로컬 기준으로 "내일"을 산출하지만, BE는 서버 로컬 기준 `targetDate`를 비교. 시차 환경에서 표시·결과가 어긋남.
-- **수정**: 항목 3과 함께 타임존 정책을 한 곳에서 결정.
+### 8. FE 표시 날짜와 BE 계산 기준 불일치 ✅ 해결됨 (2026-04-27)
+- **파일**: `packages/frontend/src/pages/TodayPage.tsx`, `packages/frontend/src/pages/TomorrowPage.tsx`, `packages/frontend/src/utils/date.ts` (신규)
+- **문제**: FE는 `new Date()` 로컬 기준으로 "오늘/내일"을 산출. BE는 #3 수정 후 `APP_TIMEZONE`(`Asia/Seoul`) 기준. 사용자 브라우저 TZ가 다르면 표시 라벨과 실제 BE 필터 결과가 어긋남.
+- **해결 방식**: BE의 `APP_TIMEZONE`과 동일한 패턴으로 FE에 `REACT_APP_TIMEZONE` env(기본 `Asia/Seoul`) 도입. `Intl.DateTimeFormat`으로 명시적 변환.
+  - `src/utils/date.ts` 신규 — `formatDateLabel(offsetDays)` 헬퍼.
+  - `TodayPage`: `formatDateLabel()` (offset 0)
+  - `TomorrowPage`: `formatDateLabel(1)`
+  - 사용자 로컬 TZ에 의존하던 `getFullYear`/`getMonth`/`getDate` 제거.
+- **변경된 코드 핵심**:
+  ```ts
+  // utils/date.ts
+  const APP_TZ = process.env.REACT_APP_TIMEZONE ?? "Asia/Seoul";
 
-### 9. 낙관적 업데이트(optimistic UI) 부재 — 모든 mutation 후 전체 리스트 refetch
-- **파일**: `packages/frontend/src/hooks/useTodos.ts:92-94` (그리고 다른 mutations)
-- **문제**: 작은 변경마다 fetch 전체 호출 → 네트워크 RTT만큼 입력 반영 지연.
-- **수정**: API 응답을 로컬 상태에 머지, 실패 시 롤백.
+  export const formatDateLabel = (offsetDays = 0): string => {
+    const target = new Date();
+    target.setUTCDate(target.getUTCDate() + offsetDays);
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: APP_TZ,
+      year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    return fmt.format(target).replace(/-/g, ".");
+  };
+  ```
 
-### 10. 드래그 reorder가 `void`로 비동기 무시 — race & 롤백 없음
-- **파일**: `packages/frontend/src/components/TodoList.tsx:90-107`
-- **문제**: `void onReorder(reorderItems)`로 결과를 기다리지 않음. 빠른 연속 드래그에서 순서 꼬임 가능, API 실패 시 UI 상태와 DB 상태 불일치.
-- **수정**: `await onReorder(...)`, 실패 시 이전 상태로 setState 롤백.
+### 9. 낙관적 업데이트(optimistic UI) 부재 — 모든 mutation 후 전체 리스트 refetch ✅ 해결됨 (2026-04-27)
+- **파일**: `packages/frontend/src/hooks/useTodos.ts`
+- **문제**: 작은 변경마다 fetch 전체 호출 → 네트워크 RTT만큼 입력 반영 지연. 토글/편집/삭제 시 UI가 "snap-back"하는 모습이 보임.
+- **해결 방식**: `runOptimistic` 헬퍼 도입 — 로컬 상태 즉시 변경 → API 호출 → 서버 동기화. 실패 시 `fetchTodos`로 진실 상태 복구.
+  - `toggleComplete`: `completedAt`을 로컬에서 즉시 토글.
+  - `editTodo`: payload를 로컬 todo에 즉시 머지.
+  - `softDelete` / `toTrash` / `restore` / `permanentDelete` / `deferTomorrow` / `deferNextWeek`: 모두 현재 리스트에서 사라지는 효과 → 로컬에서 즉시 제거.
+  - `addTodo`는 서버 생성 ID 필요해서 낙관적 적용 제외 (기존 `runMutation` 유지).
+  - `reorder`는 #10에서 `TodoList.tsx`가 자체 낙관적 상태로 처리.
+- **변경된 코드 핵심**:
+  ```ts
+  const runOptimistic = useCallback(
+    async (
+      optimisticUpdate: (prev: Todo[]) => Todo[],
+      action: () => Promise<void>,
+      fallbackMessage: string,
+    ) => {
+      setError(null);
+      setTodos((prev) => optimisticUpdate(prev));
+      try {
+        await action();
+        await fetchTodos();
+      } catch (err) {
+        await fetchTodos(); // 실패 시 진실 상태로 복구
+        setError(getErrorMessage(err, fallbackMessage));
+      }
+    },
+    [fetchTodos],
+  );
+  ```
+
+### 10. 드래그 reorder가 `void`로 비동기 무시 — race & 롤백 없음 ✅ 해결됨 (2026-04-27)
+- **파일**: `packages/frontend/src/components/TodoList.tsx`
+- **문제**: `void onReorder(reorderItems)`로 결과를 기다리지 않음. 빠른 연속 드래그에서 순서 꼬임, API 실패 시 UI/DB 상태 불일치.
+- **해결 방식**:
+  - `pendingParents` 낙관적 상태 + `isReordering` race 가드 + `useEffect`로 서버 데이터 도착 시 자동 해제.
+  - `await onReorder(...)`로 결과 대기, 실패 시 `setPendingParents(null)`로 롤백.
+  - 드래그 중에는 추가 드래그 입력을 무시 (race 방지).
+- **변경된 코드 핵심**:
+  ```tsx
+  const [pendingParents, setPendingParents] = useState<Todo[] | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+  const displayedParents = pendingParents ?? parents;
+
+  useEffect(() => {
+    if (!pendingParents) return;
+    const matches =
+      parents.length === pendingParents.length &&
+      parents.every((p, i) => p.id === pendingParents[i].id);
+    if (matches) setPendingParents(null);
+  }, [parents, pendingParents]);
+
+  const onDragEnd = async (sourceIndex, destinationIndex) => {
+    if (sourceIndex === destinationIndex || isReordering) return;
+    const ordered = /* ... */;
+    setPendingParents(ordered);
+    setIsReordering(true);
+    try {
+      await onReorder(/* ... */);
+    } catch {
+      setPendingParents(null); // rollback
+    } finally {
+      setIsReordering(false);
+    }
+  };
+  ```
 
 ---
 
 ## 🟢 Low
 
-### 11. `packages/backend/.git` 디렉토리 존재 — 모노레포 git 구조 이상
+### 11. `packages/backend/.git` 디렉토리 존재 — 모노레포 git 구조 이상 ✅ 해결됨 (2026-04-27)
 - **위치**: `packages/backend/.git/` (존재), 루트 `.git` 없음.
-- **문제**: 루트는 git 저장소가 아닌데 backend만 단독 저장소. CI/배포·로그·블레임이 패키지별로 갈려 모노레포 의미 상실.
-- **수정**: 루트에서 `git init` 후 backend의 `.git` 제거하거나, 의도된 분리 저장소라면 모노레포 README/문서로 명시.
+- **문제**: 루트는 git 저장소가 아닌데 backend만 단독 저장소. CI/배포·로그·블레임이 패키지별로 갈려 모노레포 의미 상실. 또한 frontend 변경이 한 번도 추적되지 않음.
+- **해결 방식**: 모노레포 루트에 새 git 저장소 생성하고 새 GitHub repo로 마이그레이션.
+  - 기존 backend 단독 repo의 `.git`을 `.git.bak`으로 안전 백업
+  - 모노레포 루트(`nest-todo-list/`)에 `git init -b main`
+  - 통합 `.gitignore` 작성 (node_modules, dist, build, .env, *.sqlite, .DS_Store, .git.bak 등)
+  - backend + frontend 통째로 첫 commit (`da458e8`)
+  - 새 GitHub repo `https://github.com/hidoKim/nest-todo-monorepo` 생성 후 push
+  - 옛 repo `nestJS-todo-list`는 fork/star 0이라 사용자가 삭제
+- **추가로 정리된 것**: 옛 backend repo에 잘못 올라가 있던 항목들이 새 repo에는 0개.
+  - `node_modules/typescript/**` 134개 → 0개
+  - `dist/**` 43개 → 0개
+  - `.DS_Store` 2개 → 0개
+  - `todo.sqlite` 24KB → 0KB
+- **수정한 파일**:
+  - `.gitignore` (루트 신규)
+  - `packages/backend/.gitignore` (이미 이전 단계에서 생성됨)
+- **남은 후속 작업 (선택)**:
+  - 며칠 새 repo 사용해보고 이상 없으면 `rm -rf packages/backend/.git.bak`로 백업 정리.
 
-### 12. 루트 `build` 스크립트가 `concurrently` 미사용 (직렬)
-- **파일**: `package.json:11`
+### 12. 루트 `build` 스크립트가 `concurrently` 미사용 (직렬) ✅ 해결됨 (2026-04-27)
+- **파일**: `package.json`
 - **문제**: backend 빌드가 끝나야 frontend 시작. dev에서는 `concurrently`를 쓰면서 build에서는 안 씀.
-- **수정**:
+- **해결 방식**: `concurrently` + workspace flag(`-w`) 사용으로 변경. lint도 같은 패턴으로 정리.
+- **변경된 코드**:
   ```json
-  "build": "concurrently \"npm -w packages/backend run build\" \"npm -w packages/frontend run build\""
+  "build": "concurrently -n backend,frontend \"npm -w packages/backend run build\" \"npm -w packages/frontend run build\"",
+  "lint": "concurrently -n backend,frontend \"npm -w packages/backend run lint\" \"npm -w packages/frontend run lint\""
   ```
-  workspace 플래그(`-w`)로 cd 체이닝도 제거.
+  - `-n backend,frontend`로 각 출력에 라벨 표시 (디버깅 용이)
+  - `-w` workspace flag로 cd 체이닝 제거
 
-### 13. SQLite DB 파일과 `.env`가 저장소에 포함될 위험
+### 13. SQLite DB 파일과 `.env`가 저장소에 포함될 위험 ✅ 해결됨 (2026-04-27)
 - **파일**: `packages/backend/todo.sqlite`, `packages/backend/.env`
-- **문제**: 루트 `.gitignore`에 `.env`는 있지만 `*.sqlite`/`*.db`는 없음. backend가 별도 git 저장소라 그쪽 .gitignore 정책에 따라 이미 추적 중일 수 있음.
-- **수정**: `.gitignore`에 `*.sqlite`, `*.db`, `*.sqlite-journal` 추가. 이미 추적 중이라면 `git rm --cached`.
+- **문제**: 루트 `.gitignore`에 `.env`는 있지만 `*.sqlite`/`*.db`는 없음. backend가 별도 git 저장소라 그쪽 .gitignore 정책에 따라 이미 추적 중.
+- **해결 방식**: 모노레포 마이그레이션(#11)과 함께 통합 `.gitignore`에 다음 패턴 추가.
+  - `.env`, `.env.local`, `.env.*.local`, `**/.env`
+  - `*.sqlite`, `*.sqlite-journal`
+  - `node_modules/`, `dist/`, `build/`, `coverage/`, `*.tsbuildinfo`
+  - `.DS_Store`, `.git.bak/`, `*.bak` 등
+- **검증**: 새 repo `nest-todo-monorepo`에 위 패턴 검사 결과 0건. `gh api .../git/trees/main?recursive=1`로 확인 완료.
 
-### 14. Jest 설정 파일 중복 (`jest.config.ts` + `jest.config.js`)
-- **파일**: `packages/backend/jest.config.ts`, `packages/backend/jest.config.js`
-- **문제**: 두 형식이 공존하면 어떤 게 적용되는지 모호 (대개 `.js`가 우선). `ts` 쪽 의도가 무시될 수 있음.
-- **수정**: 하나만 남기고 다른 하나 삭제.
+### 14. Jest 설정 파일 중복 (`jest.config.ts` + `jest.config.js`) ✅ 해결됨 (2026-04-27)
+- **파일**: `packages/backend/jest.config.ts`, ~~`packages/backend/jest.config.js`~~
+- **문제**: 두 형식이 공존하면 어떤 게 적용되는지 모호. 실제로 이전 단계에서 `npx jest` 실행 시 "Multiple configurations found" 에러 발생.
+- **해결 방식**: `jest.config.js`(컴파일 산출물) 삭제, `jest.config.ts`만 원본으로 유지.
+  - 같은 이유로 `test/date.util.spec.js`, `test/tags.service.spec.js`도 함께 제거 (원본 `.ts` 유지).
+  - 루트 `.gitignore`의 `*.tsbuildinfo`로 향후 우발적 컴파일 산출물 추적 차단.
+- **수정한 파일**:
+  - `packages/backend/jest.config.js` 삭제
+  - `packages/backend/test/date.util.spec.js` 삭제
+  - `packages/backend/test/tags.service.spec.js` 삭제
 
 ---
 

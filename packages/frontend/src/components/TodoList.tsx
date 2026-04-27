@@ -1,5 +1,5 @@
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Tag } from "../types/Tag";
 import { ReorderItem, Todo, TodoListType } from "../types/Todo";
 import SubTodoItem from "./SubTodoItem";
@@ -87,23 +87,45 @@ const TodoList = ({
     setForm({ title: "", content: "", dueDate: "", tag: "" });
   };
 
-  const onDragEnd = (sourceIndex: number, destinationIndex: number) => {
-    if (sourceIndex === destinationIndex) {
+  // 서버 fetch가 완료될 때까지 드래그 결과를 화면에 유지하기 위한 낙관적 상태.
+  const [pendingParents, setPendingParents] = useState<Todo[] | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+
+  const displayedParents = pendingParents ?? parents;
+
+  // 서버 데이터가 우리 낙관적 순서와 일치하면 낙관적 상태 해제.
+  useEffect(() => {
+    if (!pendingParents) return;
+    const matches =
+      parents.length === pendingParents.length &&
+      parents.every((p, i) => p.id === pendingParents[i].id);
+    if (matches) setPendingParents(null);
+  }, [parents, pendingParents]);
+
+  const onDragEnd = async (sourceIndex: number, destinationIndex: number) => {
+    if (sourceIndex === destinationIndex || isReordering) {
       return;
     }
 
-    const ordered = [...parents];
-    const fromIndex = sourceIndex;
-    const toIndex = destinationIndex;
-    const [dragged] = ordered.splice(fromIndex, 1);
-    ordered.splice(toIndex, 0, dragged);
+    const ordered = [...displayedParents];
+    const [dragged] = ordered.splice(sourceIndex, 1);
+    ordered.splice(destinationIndex, 0, dragged);
+
+    setPendingParents(ordered);
+    setIsReordering(true);
 
     const reorderItems: ReorderItem[] = ordered.map((item, index) => ({
       id: item.id,
       order: index,
     }));
 
-    void onReorder(reorderItems);
+    try {
+      await onReorder(reorderItems);
+    } catch {
+      setPendingParents(null); // rollback
+    } finally {
+      setIsReordering(false);
+    }
   };
 
   return (
@@ -176,7 +198,7 @@ const TodoList = ({
             if (!result.destination) {
               return;
             }
-            onDragEnd(result.source.index, result.destination.index);
+            void onDragEnd(result.source.index, result.destination.index);
           }}
         >
           <Droppable droppableId="todo-parents">
@@ -186,7 +208,7 @@ const TodoList = ({
                 ref={provided.innerRef}
                 {...provided.droppableProps}
               >
-                {parents.map((todo, index) => (
+                {displayedParents.map((todo, index) => (
                   <Draggable
                     key={todo.id}
                     draggableId={String(todo.id)}
