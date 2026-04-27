@@ -1,0 +1,17 @@
+{
+  "name": "todo-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start:dev": "npm run dev",
+    "dev": "concurrently \"cd packages/backend && npm run start:dev\" \"cd packages/frontend && npm run start\"",
+    "build": "cd packages/backend && npm run build && cd ../frontend && npm run build",
+    "lint": "cd packages/backend && npm run lint && cd ../frontend && npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
