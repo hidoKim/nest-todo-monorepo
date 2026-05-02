@@ -4,7 +4,7 @@
 // 모듈 로드 시점이 아니라 호출 시점에 읽어야 함.
 // ConfigModule(dotenv)이 NestFactory.create() 안에서 .env를 로드하기 때문에,
 // 이 모듈이 먼저 import되면 process.env.APP_TIMEZONE은 아직 비어 있음.
-const getAppTz = (): string => process.env.APP_TIMEZONE ?? 'Asia/Seoul';
+const getAppTz = (): string => process.env.APP_TIMEZONE ?? "Asia/Seoul";
 
 export interface DateRange {
   start: Date;
@@ -14,16 +14,16 @@ export interface DateRange {
 const getCalendarPartsInTz = (
   instant: Date = new Date(),
 ): { year: number; month: number; day: number } => {
-  const fmt = new Intl.DateTimeFormat('en-US', {
+  const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: getAppTz(),
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
   const parts = fmt.formatToParts(instant);
-  const get = (k: 'year' | 'month' | 'day') =>
+  const get = (k: "year" | "month" | "day") =>
     Number(parts.find((p) => p.type === k)?.value);
-  return { year: get('year'), month: get('month'), day: get('day') };
+  return { year: get("year"), month: get("month"), day: get("day") };
 };
 
 const calendarToUtcMidnight = (parts: {
@@ -33,11 +33,11 @@ const calendarToUtcMidnight = (parts: {
 }): Date => new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
 
 const getWeekdayInTz = (instant: Date = new Date()): number => {
-  const wd = new Intl.DateTimeFormat('en-US', {
+  const wd = new Intl.DateTimeFormat("en-US", {
     timeZone: getAppTz(),
-    weekday: 'short',
+    weekday: "short",
   }).format(instant);
-  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(wd);
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd);
 };
 
 export const startOfDay = (date: Date): Date => {
@@ -52,6 +52,7 @@ export const endOfDay = (date: Date): Date => {
   return value;
 };
 
+// TypeORM의 Date 변환기. Date 객체를 ISO 문자열로 저장하고, 불러올 때 다시 Date 객체로 변환한다.
 export const addDays = (date: Date, days: number): Date => {
   const value = new Date(date);
   value.setUTCDate(value.getUTCDate() + days);
@@ -84,11 +85,12 @@ export const getNextWeekRange = (): DateRange => {
 // (앵커가 항상 UTC 자정이므로 getUTC* 사용해야 의도한 날짜가 나옴.)
 export const getDateOnlyString = (date: Date): string => {
   const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
+// addDays를 사용하여 date에 days만큼 더한 후, getDateOnlyString으로 YYYY-MM-DD 문자열로 변환한다.
 export const getDateAfterDaysString = (days: number): string => {
   return getDateOnlyString(addDays(getTodayDate(), days));
 };
