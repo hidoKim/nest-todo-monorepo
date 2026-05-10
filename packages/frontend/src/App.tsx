@@ -5,20 +5,33 @@ import ThisWeekPage from "./pages/ThisWeekPage";
 import TodayPage from "./pages/TodayPage";
 import TomorrowPage from "./pages/TomorrowPage";
 import TrashPage from "./pages/TrashPage";
+import OnboardingPage from "./pages/OnboardingPage";
+import LoginPage from "./pages/LoginPage";
+import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 
 const App = () => {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Navigate to="/today" replace />} />
-        <Route path="/today" element={<TodayPage />} />
-        <Route path="/tomorrow" element={<TomorrowPage />} />
-        <Route path="/this-week" element={<ThisWeekPage />} />
-        <Route path="/next-week" element={<NextWeekPage />} />
-        <Route path="/trash" element={<TrashPage />} />
-        <Route path="*" element={<Navigate to="/today" replace />} />
-      </Routes>
-    </Layout>
+    <Routes>
+      <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+      <Route
+        path="/*"
+        element={
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Navigate to="/today" replace />} />
+              <Route path="/today" element={<TodayPage />} />
+              <Route path="/tomorrow" element={<TomorrowPage />} />
+              <Route path="/this-week" element={<ThisWeekPage />} />
+              <Route path="/next-week" element={<NextWeekPage />} />
+              <Route path="/trash" element={<TrashPage />} />
+              <Route path="*" element={<Navigate to="/today" replace />} />
+            </Routes>
+          </Layout>
+        }
+      />
+    </Routes>
   );
 };
 
