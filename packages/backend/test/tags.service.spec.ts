@@ -37,11 +37,16 @@ describe('TagsService', () => {
     tagRepository = moduleRef.get(getRepositoryToken(Tag));
   });
 
-  it('throws when creating duplicate tag', async () => {
-    tagRepository.findOne.mockResolvedValue({ id: 1, name: '집안일' } as Tag);
+  it('throws when creating duplicate tag for the same user', async () => {
+    // 같은 userId 스코프에서 같은 이름이 이미 있으면 BadRequestException.
+    tagRepository.findOne.mockResolvedValue({
+      id: 1,
+      userId: 1,
+      name: '집안일',
+    } as Tag);
 
-    await expect(service.create({ name: '집안일' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.create(1, { name: '집안일' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

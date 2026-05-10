@@ -1,10 +1,17 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+// @types/cookie-parser는 namespace export여서 `import * as`로 받으면 호출 불가능한 namespace로 인식된다.
+// CommonJS default를 esModuleInterop으로 끌어오는 default import 형태로 작성한다.
+import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // cookie-parser는 req.cookies를 채워준다.
+  // JwtStrategy의 cookieExtractor가 이를 사용해 access_token을 꺼낸다.
+  app.use(cookieParser());
 
   const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:3001")
     // ?? 연산자를 사용하여 CORS_ORIGIN 환경 변수가 설정되지 않은 경우 기본값으로 "http://localhost:3001"을 사용하도록 함
@@ -30,12 +37,19 @@ async function bootstrap() {
     .setTitle("Nest Todo List API")
     .setDescription("Simple and minimal Todo REST API")
     .setVersion("1.0.0")
+    // 쿠키 기반 인증을 Swagger UI에 노출. 이름은 실제 쿠키명과 일치해야 한다.
+    .addCookieAuth("access_token")
     .build();
   // API 문서의 제목, 설명, 버전을 설정하고 build() 메서드를 호출하여 최종 Swagger 설정 객체를 생성
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   // SwaggerModule.createDocument() 메서드를 사용하여 NestJS 애플리케이션과 Swagger 설정을 기반으로 Swagger 문서 객체를 생성
-  SwaggerModule.setup("api-docs", app, swaggerDocument);
+  SwaggerModule.setup("api-docs", app, swaggerDocument, {
+    // withCredentials: Swagger UI가 fetch 요청에 쿠키를 동봉하도록 한다.
+    // 이게 꺼져 있으면 register 응답의 Set-Cookie를 브라우저는 저장하지만,
+    // 다음 /me 같은 요청에 쿠키를 실어 보내지 않아 401이 난다.
+    swaggerOptions: { withCredentials: true },
+  });
 
   const port = Number(process.env.PORT) || 3000;
   await app.listen(port);

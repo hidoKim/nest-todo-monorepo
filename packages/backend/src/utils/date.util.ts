@@ -11,6 +11,7 @@ export interface DateRange {
   end: Date;
 }
 
+// getCalendarPartsInTz는 주어진 instant(기본값은 현재 시각)를 APP_TZ 기준으로 연/월/일로 분해하여 반환하는 함수다.
 const getCalendarPartsInTz = (
   instant: Date = new Date(),
 ): { year: number; month: number; day: number } => {
@@ -20,17 +21,20 @@ const getCalendarPartsInTz = (
     month: "2-digit",
     day: "2-digit",
   });
+  // Intl.DateTimeFormat 객체를 생성할 때 timeZone 옵션으로 APP_TZ를 지정하여 instant를 해당 시간대 기준으로 포맷한다.
   const parts = fmt.formatToParts(instant);
   const get = (k: "year" | "month" | "day") =>
     Number(parts.find((p) => p.type === k)?.value);
   return { year: get("year"), month: get("month"), day: get("day") };
 };
 
+// calendarToUtcMidnight는 calendar date를 UTC 자정 앵커 Date로 변환하는 함수다.
 const calendarToUtcMidnight = (parts: {
   year: number;
   month: number;
   day: number;
 }): Date => new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+// Date.UTC()를 사용하여 calendar date를 UTC 자정 앵커 Date로 변환한다. month는 0-11이므로 -1 한다.
 
 const getWeekdayInTz = (instant: Date = new Date()): number => {
   const wd = new Intl.DateTimeFormat("en-US", {

@@ -138,6 +138,68 @@ export class ReorderTodosDto {
   items!: ReorderItemDto[];
 }
 
+// TodoResponseDto는 GET/POST/PATCH가 반환하는 todo의 응답 모양을 명시한다.
+// 엔티티를 그대로 노출하면 user 관계나 password hash 같은 인접 데이터가 새어나갈 위험이 있어
+// 응답 전용 클래스를 분리해 화이트리스트 방식으로 필드를 노출한다.
+// service.toResponse가 Todo 엔티티 → 이 DTO 인스턴스로 명시 변환한다.
+export class TodoResponseDto {
+  @ApiProperty({ example: 1 })
+  id!: number;
+
+  @ApiProperty({ example: 7, description: "Owner user id" })
+  userId!: number;
+
+  @ApiProperty({ example: "장보기" })
+  title!: string;
+
+  @ApiPropertyOptional({ example: "우유, 계란", nullable: true })
+  content!: string | null;
+
+  @ApiPropertyOptional({
+    example: "2026-05-10T10:00:00.000Z",
+    nullable: true,
+    description: "완료 시각 (ISO 8601), 미완료면 null",
+  })
+  completedAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  deletedAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  trashedAt!: string | null;
+
+  @ApiPropertyOptional({ example: null, nullable: true })
+  parentId!: number | null;
+
+  @ApiProperty({ example: 0 })
+  order!: number;
+
+  @ApiPropertyOptional({ example: "03/25 (수)", nullable: true })
+  dueDate!: string | null;
+
+  @ApiProperty({ example: "2026-05-10", description: "리스트 분류용 날짜 (YYYY-MM-DD)" })
+  targetDate!: string;
+
+  @ApiPropertyOptional({
+    example: "집안일",
+    nullable: true,
+    description: "태그 이름. 엔티티가 아닌 문자열로 변환되어 반환된다.",
+  })
+  tag!: string | null;
+
+  @ApiProperty()
+  createdAt!: string;
+
+  @ApiProperty()
+  updatedAt!: string;
+}
+
+// 단순 액션(연기, 삭제, 복원, 순서 변경 등)이 반환하는 메시지 응답.
+export class MessageResponseDto {
+  @ApiProperty({ example: "Todo deferred to tomorrow (including children)" })
+  message!: string;
+}
+
 // TodoQueryDto는 할 일 조회 시 사용할 수 있는 쿼리 매개변수를 정의하는 DTO다.
 export class TodoQueryDto {
   @ApiPropertyOptional({

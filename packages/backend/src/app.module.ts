@@ -2,11 +2,14 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { AuthModule } from "./auth/auth.module";
 import { Tag } from "./tags/tag.entity";
 import { TagsModule } from "./tags/tag.module";
 import { Todo } from "./todos/todo.entity";
 import { TodosModule } from "./todos/todo.module";
 import { TrashService } from "./trash/trash.service";
+import { User } from "./users/user.entity";
+import { UsersModule } from "./users/user.module";
 
 @Module({
   imports: [
@@ -29,7 +32,7 @@ import { TrashService } from "./trash/trash.service";
             username: configService.get<string>("DB_USERNAME", "postgres"),
             password: configService.get<string>("DB_PASSWORD", "postgres"),
             database: configService.get<string>("DB_NAME", "todo_db"),
-            entities: [Todo, Tag],
+            entities: [Todo, Tag, User],
             synchronize,
           };
         }
@@ -37,13 +40,15 @@ import { TrashService } from "./trash/trash.service";
         return {
           type: "sqlite" as const, // DB_TYPE이 'postgres'가 아닌 경우 SQLite 설정을 반환
           database: configService.get<string>("SQLITE_DB", "todo.sqlite"),
-          entities: [Todo, Tag],
+          entities: [Todo, Tag, User],
           synchronize,
         };
       },
     }),
     TodosModule,
     TagsModule,
+    UsersModule,
+    AuthModule,
   ],
   providers: [TrashService],
 })

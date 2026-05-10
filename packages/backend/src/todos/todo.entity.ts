@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -9,6 +10,7 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import { Tag } from "../tags/tag.entity";
+import { User } from "../users/user.entity";
 
 // ISO 8601 문자열 ↔ Date 변환. 사전순 = 시간순이라 SQL ORDER BY도 정상.
 // SQLite/Postgres 모두 같은 동작을 보장하기 위함.
@@ -26,9 +28,21 @@ const isoDateTransformer = {
 };
 
 @Entity("todos")
+// (userId, targetDate) 복합 인덱스. "오늘/내일/이번주" 조회는 항상 user별로 좁혀지므로
+// 이 조합으로 인덱스를 걸면 가장 자주 쓰이는 쿼리가 빨라진다.
+@Index("IDX_todos_userId_targetDate", ["userId", "targetDate"])
 export class Todo {
   @PrimaryGeneratedColumn()
   id!: number;
+
+  // 소유자 식별. 모든 조회/수정/삭제는 이 컬럼으로 스코프된다.
+  // onDelete CASCADE: 사용자가 삭제되면 그 사람의 todo도 함께 사라진다.
+  @Column()
+  userId!: number;
+
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
+  user!: User;
 
   @Column()
   title!: string;
