@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { login } from "../api/auth";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -14,26 +16,20 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      // 실제 로그인 API 호출로 변경해야 함
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        throw new Error("로그인 실패");
-      }
-
-      const data = await response.json();
-      localStorage.setItem("authToken", data.token);
-      navigate("/today");
+      // login()은 백엔드에 POST /api/auth/login 호출.
+      // 성공 시 응답의 Set-Cookie 헤더로 access_token 쿠키가 자동 저장된다.
+      // 응답 body엔 사용자 정보가 들어있지만 여기서는 단순히 navigate만 한다.
+      await login({ email, password });
+      navigate("/today", { replace: true });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다",
-      );
+      // 백엔드 401(Invalid credentials) 또는 네트워크 에러 처리.
+      const message =
+        axios.isAxiosError(err) && err.response?.status === 401
+          ? "이메일 또는 비밀번호가 올바르지 않습니다"
+          : err instanceof Error
+            ? err.message
+            : "로그인 중 오류가 발생했습니다";
+      setError(message);
     } finally {
       setIsLoading(false);
     }

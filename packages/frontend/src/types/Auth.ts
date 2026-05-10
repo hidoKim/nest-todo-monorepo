@@ -1,9 +1,24 @@
 /**
  * 인증 관련 타입 정의
+ * 백엔드의 MeResponseDto와 모양을 맞춘다.
  */
 
+export type AuthProvider = "local" | "google" | "kakao";
+
 /**
- * 로그인 요청 DTO
+ * 현재 인증된 사용자 정보 — GET /api/auth/me 응답.
+ * login/register 응답도 같은 모양이다.
+ */
+export interface CurrentUser {
+  id: number;
+  email: string | null;
+  name: string | null;
+  picture: string | null;
+  provider: AuthProvider;
+}
+
+/**
+ * 이메일 로그인 요청 body (POST /api/auth/login)
  */
 export interface LoginRequest {
   email: string;
@@ -11,59 +26,15 @@ export interface LoginRequest {
 }
 
 /**
- * 로그인 응답 DTO
+ * 이메일 회원가입 요청 body (POST /api/auth/register)
  */
-export interface LoginResponse {
-  token: string;
-  user?: {
-    id: string;
-    email: string;
-    name: string;
-  };
-}
-
-/**
- * 사용자 정보
- */
-export interface User {
-  id: string;
+export interface RegisterRequest {
   email: string;
-  name: string;
-  picture?: string;
-  createdAt: Date;
-}
-
-/**
- * OAuth 프로필 정보
- */
-export interface OAuthProfile {
-  id: string;
-  email: string;
-  name: string;
-  picture?: string;
-  provider: "google" | "kakao";
-}
-
-/**
- * 인증 상태
- */
-export interface AuthState {
-  isAuthenticated: boolean;
-  user: User | null;
-  token: string | null;
-  loading: boolean;
-  error: string | null;
+  password: string;
+  name?: string;
 }
 
 /**
  * 소셜 로그인 제공자
  */
 export type SocialProvider = "google" | "kakao";
-
-/**
- * 이메일 로그인 폼 데이터
- */
-export interface EmailLoginFormData {
-  email: string;
-  password: string;
-}

@@ -1,17 +1,19 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { handleSocialLogin } from "../utils/auth";
+import { useCurrentUser } from "../hooks/useCurrentUser";
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
+  // 쿠키는 JS에서 직접 읽을 수 없으므로 /api/auth/me로 서버에 물어본다.
+  // 이미 로그인 상태면 곧장 메인으로 이동.
+  const { status } = useCurrentUser();
 
-  // 로컬스토리지에서 토큰 확인 - 있으면 홈으로 리다이렉트
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (token) {
-      navigate("/today");
+    if (status === "authenticated") {
+      navigate("/today", { replace: true });
     }
-  }, [navigate]);
+  }, [status, navigate]);
 
   const handleEmailLogin = () => {
     navigate("/login");

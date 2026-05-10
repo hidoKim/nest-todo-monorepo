@@ -1,5 +1,4 @@
 import axios from "axios";
-import { getAuthToken } from "../utils/auth";
 
 const baseURL = process.env.REACT_APP_API_BASE_URL;
 
@@ -9,38 +8,27 @@ if (!baseURL) {
   );
 }
 
+// withCredentials: true → 모든 요청에 자동으로 쿠키 동봉.
+// 백엔드가 httpOnly 쿠키로 access_token을 발급하므로 JS에서 토큰을 다룰 일이 없다.
+// (이전 Bearer 방식의 Authorization 헤더 인터셉터는 제거됐다.)
 export const apiClient = axios.create({
   baseURL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-/**
- * 요청 인터셉터: 모든 요청에 인증 토큰 추가
- */
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = getAuthToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  },
-);
-
-/**
- * 응답 인터셉터: 401 에러 처리
- */
+// 응답 인터셉터: 401 처리.
+// 만료/누락 쿠키일 때 axios 호출 지점에서 직접 다루지 않아도 자동으로 온보딩으로 이동.
+// 단, /api/auth/me 호출 자체의 401은 ProtectedRoute가 자체 분기에서 처리하므로
+// 무한 리다이렉트를 막기 위해 여기서는 그 경로만 예외.
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // 토큰이 만료되었거나 유효하지 않은 경우
-      localStorage.removeItem("authToken");
+    const status = error.response?.status;
+    const url: string = error.config?.url ?? "";
+    if (status === 401 && !url.includes("/api/auth/me")) {
       window.location.href = "/onboarding";
     }
     return Promise.reject(error);

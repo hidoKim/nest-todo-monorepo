@@ -1,30 +1,30 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { extractAndStoreToken } from "../utils/auth";
+import { useCurrentUser } from "../hooks/useCurrentUser";
 
 /**
- * OAuth 콜백 페이지
- * Google/Kakao 로그인 후 리다이렉트되는 페이지
- * URL 파라미터에서 토큰을 추출하고 로컬스토리지에 저장
+ * OAuth 콜백 페이지.
+ *
+ * 흐름:
+ * 1. 백엔드의 /auth/google/callback 또는 /auth/kakao/callback이
+ *    Set-Cookie로 access_token을 내려준 뒤 이 페이지로 redirect한다.
+ * 2. 이 시점에 브라우저엔 이미 쿠키가 저장돼 있으므로
+ *    프론트는 토큰을 추출/저장할 일이 없다.
+ * 3. /api/auth/me로 한 번 검증한 뒤
+ *    - 인증됨 → /today
+ *    - 게스트(콜백이 어떤 이유로 실패) → /onboarding
  */
 const OAuthCallbackPage = () => {
   const navigate = useNavigate();
+  const { status } = useCurrentUser();
 
   useEffect(() => {
-    const token = extractAndStoreToken();
-
-    if (token) {
-      // 토큰이 있으면 메인 페이지로 이동
-      setTimeout(() => {
-        navigate("/today");
-      }, 1000);
-    } else {
-      // 토큰이 없으면 로그인 페이지로 돌아가기
-      setTimeout(() => {
-        navigate("/onboarding", { replace: true });
-      }, 2000);
+    if (status === "authenticated") {
+      navigate("/today", { replace: true });
+    } else if (status === "guest") {
+      navigate("/onboarding", { replace: true });
     }
-  }, [navigate]);
+  }, [status, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-muji-bg via-muji-panel to-muji-bg flex items-center justify-center">
