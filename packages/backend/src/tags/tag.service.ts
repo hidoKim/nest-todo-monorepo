@@ -1,13 +1,14 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Todo } from "../todos/todo.entity";
 import { CreateTagDto, UpdateTagDto } from "./tag.dto";
 import { Tag } from "./tag.entity";
+import {
+  TagDuplicateException,
+  TagNameInUseException,
+  TagNotFoundException,
+} from "./tag.exceptions";
 
 // DEFAULT_TAGS는 신규 사용자에게 기본 제공하는 태그들이다.
 // 빈 화면 회피를 위해 가입 시 자동 생성된다.
@@ -57,7 +58,7 @@ export class TagsService {
   async create(userId: number, createTagDto: CreateTagDto): Promise<Tag> {
     const existing = await this.findByName(userId, createTagDto.name);
     if (existing) {
-      throw new BadRequestException("Tag already exists");
+      throw new TagDuplicateException();
     }
     const tag = this.tagRepository.create({
       name: createTagDto.name,
@@ -74,12 +75,12 @@ export class TagsService {
     // findOne 시점부터 userId를 함께 걸어 다른 사용자의 태그를 못 만지게 한다.
     const tag = await this.tagRepository.findOne({ where: { id, userId } });
     if (!tag) {
-      throw new NotFoundException("Tag not found");
+      throw new TagNotFoundException(id);
     }
 
     const duplicate = await this.findByName(userId, updateTagDto.name);
     if (duplicate && duplicate.id !== id) {
-      throw new BadRequestException("Tag name already in use");
+      throw new TagNameInUseException();
     }
 
     tag.name = updateTagDto.name;
@@ -89,7 +90,7 @@ export class TagsService {
   async remove(userId: number, id: number): Promise<void> {
     const tag = await this.tagRepository.findOne({ where: { id, userId } });
     if (!tag) {
-      throw new NotFoundException("Tag not found");
+      throw new TagNotFoundException(id);
     }
 
     // 같은 user의 todo 중 이 태그를 쓰던 것들의 tagId를 null로 정리.

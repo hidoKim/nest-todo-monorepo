@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { APP_FILTER } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./auth/auth.module";
+import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { Tag } from "./tags/tag.entity";
 import { TagsModule } from "./tags/tag.module";
 import { Todo } from "./todos/todo.entity";
@@ -50,6 +52,11 @@ import { UsersModule } from "./users/user.module";
     UsersModule,
     AuthModule,
   ],
-  providers: [TrashService],
+  providers: [
+    TrashService,
+    // APP_FILTER 토큰으로 등록하면 NestJS가 모든 라우트에 자동 적용한다.
+    // (JwtAuthGuard를 APP_GUARD로 등록한 것과 동일한 글로벌 패턴.)
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
+  ],
 })
 export class AppModule {}

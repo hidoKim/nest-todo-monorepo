@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { ErrorResponseDto } from "../common/dto/error-response.dto";
 import {
   CreateTodoDto,
   MessageResponseDto,
@@ -30,7 +31,11 @@ import { TodosService } from "./todo.service";
 // 클래스 단위 @ApiResponse(401)로 모든 핸들러 응답 문서에 401을 일괄 부착한다.
 @ApiTags("todos")
 @ApiCookieAuth("access_token")
-@ApiResponse({ status: 401, description: "Unauthorized — 쿠키 누락 또는 만료" })
+@ApiResponse({
+  status: 401,
+  type: ErrorResponseDto,
+  description: "Unauthorized — 쿠키 누락 또는 만료",
+})
 @Controller("todos")
 export class TodosController {
   constructor(private readonly todosService: TodosService) {}
@@ -83,7 +88,7 @@ export class TodosController {
   @Get(":id")
   @ApiOperation({ summary: "Get a single todo" })
   @ApiResponse({ status: 200, type: TodoResponseDto })
-  @ApiResponse({ status: 404, description: "Todo not found / 다른 사용자 소유" })
+  @ApiResponse({ status: 404, type: ErrorResponseDto, description: "Todo not found / 다른 사용자 소유" })
   findOne(
     @CurrentUser("id") userId: number,
     @Param("id", ParseIntPipe) id: number,
@@ -94,7 +99,7 @@ export class TodosController {
   @Post()
   @ApiOperation({ summary: "Create a todo" })
   @ApiResponse({ status: 201, type: TodoResponseDto })
-  @ApiResponse({ status: 400, description: "Invalid body / Tag not found" })
+  @ApiResponse({ status: 400, type: ErrorResponseDto, description: "Invalid body / Tag not found" })
   create(
     @CurrentUser("id") userId: number,
     @Body() createTodoDto: CreateTodoDto,
@@ -105,7 +110,7 @@ export class TodosController {
   @Patch(":id")
   @ApiOperation({ summary: "Update a todo" })
   @ApiResponse({ status: 200, type: TodoResponseDto })
-  @ApiResponse({ status: 404, description: "Todo not found" })
+  @ApiResponse({ status: 404, type: ErrorResponseDto, description: "Todo not found" })
   update(
     @CurrentUser("id") userId: number,
     @Param("id", ParseIntPipe) id: number,

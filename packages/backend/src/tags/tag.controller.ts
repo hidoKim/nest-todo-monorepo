@@ -15,6 +15,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { ErrorResponseDto } from "../common/dto/error-response.dto";
 import { CreateTagDto, TagResponseDto, UpdateTagDto } from "./tag.dto";
 import { Tag } from "./tag.entity";
 import { MessageResponseDto } from "../todos/todo.dto";
@@ -24,7 +25,11 @@ import { TagsService } from "./tag.service";
 // 클래스 단위 @ApiResponse(401)로 모든 핸들러 응답에 Unauthorized를 일괄 부착한다.
 @ApiTags("tags")
 @ApiCookieAuth("access_token")
-@ApiResponse({ status: 401, description: "Unauthorized — 쿠키 누락 또는 만료" })
+@ApiResponse({
+  status: 401,
+  type: ErrorResponseDto,
+  description: "Unauthorized — 쿠키 누락 또는 만료",
+})
 @Controller("tags")
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
@@ -39,7 +44,7 @@ export class TagsController {
   @Post()
   @ApiOperation({ summary: "Create a tag" })
   @ApiResponse({ status: 201, type: TagResponseDto })
-  @ApiResponse({ status: 400, description: "Tag already exists" })
+  @ApiResponse({ status: 400, type: ErrorResponseDto, description: "Tag already exists" })
   create(
     @CurrentUser("id") userId: number,
     @Body() createTagDto: CreateTagDto,
@@ -50,7 +55,7 @@ export class TagsController {
   @Put(":id")
   @ApiOperation({ summary: "Update a tag" })
   @ApiResponse({ status: 200, type: TagResponseDto })
-  @ApiResponse({ status: 404, description: "Tag not found" })
+  @ApiResponse({ status: 404, type: ErrorResponseDto, description: "Tag not found" })
   update(
     @CurrentUser("id") userId: number,
     @Param("id", ParseIntPipe) id: number,
@@ -62,7 +67,7 @@ export class TagsController {
   @Delete(":id")
   @ApiOperation({ summary: "Delete a tag and clear tag relation from todos" })
   @ApiResponse({ status: 200, type: MessageResponseDto })
-  @ApiResponse({ status: 404, description: "Tag not found" })
+  @ApiResponse({ status: 404, type: ErrorResponseDto, description: "Tag not found" })
   async remove(
     @CurrentUser("id") userId: number,
     @Param("id", ParseIntPipe) id: number,

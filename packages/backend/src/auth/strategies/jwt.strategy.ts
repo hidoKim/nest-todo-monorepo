@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { Request } from "express";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { UsersService } from "../../users/user.service";
+import { UserNotFoundException } from "../auth.exceptions";
 
 // JwtPayload는 우리가 발급한 JWT 안에 들어있는 정보의 모양이다.
 // sub는 JWT 표준 클레임으로 user id를 담는다.
@@ -51,7 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   async validate(payload: JwtPayload) {
     const user = await this.usersService.findById(payload.sub);
     if (!user) {
-      throw new UnauthorizedException("User no longer exists");
+      throw new UserNotFoundException();
     }
     return user;
   }

@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { HttpStatus, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 import {
@@ -16,6 +12,7 @@ import {
   parseDateOnlyString,
 } from "../utils/date.util";
 import { TagsService } from "../tags/tag.service";
+import { TagNotFoundException } from "../tags/tag.exceptions";
 import {
   CreateTodoDto,
   MessageResponseDto,
@@ -26,6 +23,16 @@ import {
   UpdateTodoDto,
 } from "./todo.dto";
 import { Todo } from "./todo.entity";
+import {
+  TodoAlreadyTrashedException,
+  TodoDeferNextWeekThisWeekOnlyException,
+  TodoDeferTomorrowTodayOnlyException,
+  TodoDeletedOrTrashedException,
+  TodoLoadFailedException,
+  TodoNotFoundException,
+  TodoParentInvalidException,
+  TodoReorderInvalidException,
+} from "./todo.exceptions";
 
 // Date | null → ISO string | null 변환 헬퍼.
 // JSON 직렬화에 맡기지 않고 명시 변환하면 응답 스키마가 더 분명해진다.
@@ -62,7 +69,7 @@ export class TodosService {
     }
     const tag = await this.tagsService.findByName(userId, tagName);
     if (!tag) {
-      throw new BadRequestException(`Tag not found: ${tagName}`);
+      throw new TagNotFoundException(tagName);
     }
     return tag.id;
   }
@@ -101,7 +108,7 @@ export class TodosService {
       relations: { tag: true },
     });
     if (!todo) {
-      throw new NotFoundException(`Todo not found: ${id}`);
+      throw new TodoNotFoundException(id);
     }
     return todo;
   }
@@ -167,7 +174,7 @@ export class TodosService {
       // 부모도 같은 user 소유인지 확인. 다른 사용자의 todo를 부모로 지정 못 함.
       const parent = await this.getExistingTodo(userId, createTodoDto.parentId);
       if (parent.deletedAt || parent.trashedAt) {
-        throw new BadRequestException(
+        throw new TodoParentInvalidException(
           "Cannot add child to deleted or trashed parent",
         );
       }
@@ -192,7 +199,7 @@ export class TodosService {
       relations: { tag: true },
     });
     if (!loaded) {
-      throw new NotFoundException("Failed to load created todo");
+      throw new TodoLoadFailedException("Failed to load created todo");
     }
     return this.toResponse(loaded);
   }
@@ -242,7 +249,8 @@ export class TodosService {
   ): Promise<TodoResponseDto> {
     const todo = await this.getExistingTodo(userId, id);
     if (todo.deletedAt || todo.trashedAt) {
-      throw new NotFoundException(`Todo is deleted or in trash: ${id}`);
+      // 사용자 입장에선 "삭제된 todo는 존재하지 않는 것" → NotFound로 통일.
+      throw new TodoNotFoundException(id);
     }
     return this.toResponse(todo);
   }
@@ -254,7 +262,9 @@ export class TodosService {
   ): Promise<TodoResponseDto> {
     const todo = await this.getExistingTodo(userId, id);
     if (todo.deletedAt || todo.trashedAt) {
-      throw new BadRequestException("Cannot update deleted or trashed todo");
+      throw new TodoDeletedOrTrashedException(
+        "Cannot update deleted or trashed todo",
+      );
     }
 
     if (updateTodoDto.title !== undefined) {
@@ -283,7 +293,7 @@ export class TodosService {
       } else {
         const nextTag = await this.tagsService.findByName(userId, nextTagName);
         if (!nextTag) {
-          throw new BadRequestException(`Tag not found: ${nextTagName}`);
+          throw new TagNotFoundException(nextTagName);
         }
         todo.tagId = nextTag.id;
         todo.tag = nextTag;
@@ -296,7 +306,7 @@ export class TodosService {
       relations: { tag: true },
     });
     if (!loaded) {
-      throw new NotFoundException("Failed to load updated todo");
+      throw new TodoLoadFailedException("Failed to load updated todo");
     }
     return this.toResponse(loaded);
   }
@@ -307,7 +317,9 @@ export class TodosService {
   ): Promise<TodoResponseDto> {
     const todo = await this.getExistingTodo(userId, id);
     if (todo.deletedAt || todo.trashedAt) {
-      throw new BadRequestException("Cannot complete deleted or trashed todo");
+      throw new TodoDeletedOrTrashedException(
+        "Cannot complete deleted or trashed todo",
+      );
     }
     todo.completedAt = new Date();
     const saved = await this.todoRepository.save(todo);
@@ -316,7 +328,7 @@ export class TodosService {
       relations: { tag: true },
     });
     if (!loaded) {
-      throw new NotFoundException("Failed to load completed todo");
+      throw new TodoLoadFailedException("Failed to load completed todo");
     }
     return this.toResponse(loaded);
   }
@@ -327,7 +339,7 @@ export class TodosService {
   ): Promise<TodoResponseDto> {
     const todo = await this.getExistingTodo(userId, id);
     if (todo.deletedAt || todo.trashedAt) {
-      throw new BadRequestException(
+      throw new TodoDeletedOrTrashedException(
         "Cannot mark incomplete for deleted or trashed todo",
       );
     }
@@ -338,7 +350,7 @@ export class TodosService {
       relations: { tag: true },
     });
     if (!loaded) {
-      throw new NotFoundException("Failed to load incomplete todo");
+      throw new TodoLoadFailedException("Failed to load incomplete todo");
     }
     return this.toResponse(loaded);
   }
@@ -359,13 +371,13 @@ export class TodosService {
   ): Promise<MessageResponseDto> {
     const todo = await this.getExistingTodo(userId, id);
     if (todo.deletedAt || todo.trashedAt) {
-      throw new BadRequestException("Cannot defer deleted or trashed todo");
+      throw new TodoDeletedOrTrashedException(
+        "Cannot defer deleted or trashed todo",
+      );
     }
     const todayString = getDateOnlyString(getTodayDate());
     if (todo.targetDate !== todayString) {
-      throw new BadRequestException(
-        "defer-to-tomorrow is only allowed for today list",
-      );
+      throw new TodoDeferTomorrowTodayOnlyException();
     }
     await this.moveSubtreeTargetDate(userId, id, getDateAfterDaysString(1));
     return { message: "Todo deferred to tomorrow (including children)" };
@@ -377,14 +389,14 @@ export class TodosService {
   ): Promise<MessageResponseDto> {
     const todo = await this.getExistingTodo(userId, id);
     if (todo.deletedAt || todo.trashedAt) {
-      throw new BadRequestException("Cannot defer deleted or trashed todo");
+      throw new TodoDeletedOrTrashedException(
+        "Cannot defer deleted or trashed todo",
+      );
     }
     const thisWeek = getThisWeekRange();
     const targetDate = parseDateOnlyString(todo.targetDate);
     if (targetDate < thisWeek.start || targetDate > thisWeek.end) {
-      throw new BadRequestException(
-        "defer-to-next-week is only allowed for this-week list",
-      );
+      throw new TodoDeferNextWeekThisWeekOnlyException();
     }
     await this.moveSubtreeTargetDate(
       userId,
@@ -400,7 +412,7 @@ export class TodosService {
   ): Promise<MessageResponseDto> {
     const todo = await this.getExistingTodo(userId, id);
     if (todo.trashedAt) {
-      throw new BadRequestException("Todo is already in trash");
+      throw new TodoAlreadyTrashedException();
     }
     const ids = await this.getSubtreeIds(userId, id);
     await this.todoRepository.update(
@@ -465,12 +477,17 @@ export class TodosService {
 
     if (todos.length !== ids.length) {
       // 본인 소유 아닌 id가 섞여 있어도 이 분기로 떨어진다 → 정보 노출 없음.
-      throw new NotFoundException("One or more todos were not found");
+      throw new TodoReorderInvalidException(
+        "One or more todos were not found",
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     const hasInactive = todos.some((todo) => todo.deletedAt || todo.trashedAt);
     if (hasInactive) {
-      throw new BadRequestException("Cannot reorder deleted or trashed todos");
+      throw new TodoReorderInvalidException(
+        "Cannot reorder deleted or trashed todos",
+      );
     }
 
     await this.todoRepository.manager.transaction(async (manager) => {

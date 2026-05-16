@@ -18,6 +18,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Request, Response } from "express";
+import { ErrorResponseDto } from "../common/dto/error-response.dto";
 import { User } from "../users/user.entity";
 import { AuthService } from "./auth.service";
 import { LoginDto, MeResponseDto, RegisterDto } from "./auth.dto";
@@ -100,7 +101,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Email/password login (sets httpOnly cookie)" })
   @ApiResponse({ status: 200, type: MeResponseDto })
-  @ApiResponse({ status: 401, description: "Invalid credentials" })
+  @ApiResponse({ status: 401, type: ErrorResponseDto, description: "Invalid credentials" })
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -116,7 +117,7 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Email/password register" })
   @ApiResponse({ status: 201, type: MeResponseDto })
-  @ApiResponse({ status: 409, description: "Email already in use" })
+  @ApiResponse({ status: 409, type: ErrorResponseDto, description: "Email already in use" })
   async register(
     @Body() dto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
@@ -144,7 +145,7 @@ export class AuthController {
   @ApiCookieAuth("access_token")
   @ApiOperation({ summary: "Get current authenticated user" })
   @ApiResponse({ status: 200, type: MeResponseDto })
-  @ApiResponse({ status: 401, description: "Not authenticated" })
+  @ApiResponse({ status: 401, type: ErrorResponseDto, description: "Not authenticated" })
   me(@CurrentUser() user: User): MeResponseDto {
     return this.toMe(user);
   }

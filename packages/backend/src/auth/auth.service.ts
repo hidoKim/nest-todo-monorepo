@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 // bcryptjs: 순수 JS 구현. native 빌드(@nodejs gyp) 없이 동작해 macOS/Windows 환경 마찰이 적다.
@@ -11,6 +7,10 @@ import * as bcrypt from "bcryptjs";
 import { Response } from "express";
 import { UsersService } from "../users/user.service";
 import { User } from "../users/user.entity";
+import {
+  EmailInUseException,
+  InvalidCredentialsException,
+} from "./auth.exceptions";
 import { JwtPayload } from "./strategies/jwt.strategy";
 
 // bcrypt salt round는 학습용 기본값. 프로덕션은 12 이상 권장.
@@ -66,11 +66,11 @@ export class AuthService {
   async validateLocalUser(email: string, password: string): Promise<User> {
     const user = await this.usersService.findLocalByEmail(email);
     if (!user || !user.passwordHash) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new InvalidCredentialsException();
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new InvalidCredentialsException();
     }
     return user;
   }
@@ -83,7 +83,7 @@ export class AuthService {
   }): Promise<User> {
     const exists = await this.usersService.findLocalByEmail(input.email);
     if (exists) {
-      throw new ConflictException("Email already in use");
+      throw new EmailInUseException();
     }
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
     return this.usersService.createLocal({
