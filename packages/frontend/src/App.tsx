@@ -8,6 +8,7 @@ import TomorrowPage from "./pages/TomorrowPage";
 import TrashPage from "./pages/TrashPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 
 // ProtectedRoute가 보호 라우트들의 공통 부모로 한 번만 감싸지므로
@@ -17,6 +18,7 @@ const App = () => {
     <Routes>
       <Route path="/onboarding" element={<OnboardingPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
       <Route path="/auth/callback" element={<OAuthCallbackPage />} />
       <Route
         path="/*"
