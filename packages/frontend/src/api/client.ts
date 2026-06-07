@@ -1,12 +1,10 @@
 import axios from "axios";
 
-const baseURL = process.env.REACT_APP_API_BASE_URL;
-
-if (!baseURL) {
-  throw new Error(
-    "REACT_APP_API_BASE_URL is not defined. Set it in packages/frontend/.env (dev) or .env.production / CI env (build).",
-  );
-}
+// 배포(Vercel)에서는 vercel.json rewrites로 /api·/todos·/tags를 백엔드로 프록시한다.
+// baseURL을 비워 same-origin 상대경로로 요청하면 응답 쿠키가 vercel.app(=first-party)에
+// 저장되어 서드파티 쿠키 차단을 우회한다.
+// 로컬 개발은 packages/frontend/.env의 REACT_APP_API_BASE_URL=http://localhost:3000을 사용.
+const baseURL = process.env.REACT_APP_API_BASE_URL ?? "";
 
 // withCredentials: true → 모든 요청에 자동으로 쿠키 동봉.
 // 백엔드가 httpOnly 쿠키로 access_token을 발급하므로 JS에서 토큰을 다룰 일이 없다.

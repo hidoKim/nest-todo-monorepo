@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://nest-todo-monorepo-backend-latest.onrender.com/api/:path*"
+    },
+    {
+      "source": "/todos",
+      "destination": "https://nest-todo-monorepo-backend-latest.onrender.com/todos"
+    },
+    {
+      "source": "/todos/:path*",
+      "destination": "https://nest-todo-monorepo-backend-latest.onrender.com/todos/:path*"
+    },
+    {
+      "source": "/tags",
+      "destination": "https://nest-todo-monorepo-backend-latest.onrender.com/tags"
+    },
+    {
+      "source": "/tags/:path*",
+      "destination": "https://nest-todo-monorepo-backend-latest.onrender.com/tags/:path*"
+    }
+  ]
+}
