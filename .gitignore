@@ -35,3 +35,6 @@ Thumbs.db
 # Local backups
 .git.bak/
 *.bak
+
+# 블로그 파일
+blog/**

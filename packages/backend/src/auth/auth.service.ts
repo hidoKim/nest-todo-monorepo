@@ -40,10 +40,10 @@ export class AuthService {
   setAuthCookie(res: Response, token: string): void {
     const isProd = this.configService.get<string>("NODE_ENV") === "production";
     res.cookie("access_token", token, {
-      httpOnly: true,                    // JS 접근 차단 → XSS 토큰 탈취 방지
-      secure: isProd,                    // production은 HTTPS만 허용
-      sameSite: "lax",                   // CSRF 1차 방어 + OAuth redirect 호환
-      maxAge: 24 * 60 * 60 * 1000,       // 24시간
+      httpOnly: true, // JS 접근 차단 → XSS 토큰 탈취 방지
+      secure: isProd, // production은 HTTPS만 허용
+      sameSite: isProd ? "none" : "lax", // ← cross-site(Vercel↔Render)는 none 필수
+      maxAge: 24 * 60 * 60 * 1000, // 24시간
       path: "/",
     });
   }
@@ -55,7 +55,7 @@ export class AuthService {
     res.clearCookie("access_token", {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax",
+      sameSite: isProd ? "none" : "lax",
       path: "/",
     });
   }

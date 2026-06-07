@@ -27,13 +27,25 @@ import { UsersModule } from "./users/user.module";
 
         if (dbType === "postgres") {
           // DB_TYPE이 'postgres'인 경우 PostgreSQL 설정을 반환
+          const url = configService.get<string>("DATABASE_URL");
           return {
             type: "postgres" as const,
-            host: configService.get<string>("DB_HOST", "localhost"),
-            port: Number(configService.get<string>("DB_PORT", "5432")),
-            username: configService.get<string>("DB_USERNAME", "postgres"),
-            password: configService.get<string>("DB_PASSWORD", "postgres"),
-            database: configService.get<string>("DB_NAME", "todo_db"),
+            ...(url
+              ? { url }
+              : {
+                  host: configService.get<string>("DB_HOST", "localhost"),
+                  port: Number(configService.get<string>("DB_PORT", "5432")),
+                  username: configService.get<string>(
+                    "DB_USERNAME",
+                    "postgres",
+                  ),
+                  password: configService.get<string>(
+                    "DB_PASSWORD",
+                    "postgres",
+                  ),
+                  database: configService.get<string>("DB_NAME", "todo_db"),
+                }),
+            ssl: { rejectUnauthorized: false },
             entities: [Todo, Tag, User],
             synchronize,
           };
